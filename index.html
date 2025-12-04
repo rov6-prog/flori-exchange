@@ -139,6 +139,20 @@
 
     <script>
         const tg = window.Telegram.WebApp;
+        tg.expand(); // На весь экран
+
+        // Получаем параметры из URL
+        const params = new URLSearchParams(window.location.search);
+        
+        // ?buy=100 или ?sell=100
+        const buyAmount = params.get('buy');
+        const sellAmount = params.get('sell');
+        const targetId = params.get('id'); // ID для сверки
+
+        // Логика проверки пользователя
+        const currentUser = tg.initDataUnsafe?.user;
+        const currentUserId = currentUser ? String(currentUser.id) : null;
+
         // Элементы
         const appDiv = document.getElementById('app');
         const deniedDiv = document.getElementById('denied');
@@ -147,100 +161,58 @@
         const amountEl = document.getElementById('amount-text');
         const btnEl = document.getElementById('confirm-btn');
         const iconEl = document.getElementById('action-icon');
-    
-        // Функция для показа критических ошибок
-        function showError(title, msg) {
+
+        // Проверка ID
+        if (!currentUserId || !targetId || currentUserId !== targetId) {
             deniedDiv.style.display = 'flex';
-            deniedDiv.style.textAlign = 'center';
-            deniedDiv.innerHTML = `
-                <div class="icon">⚠️</div>
-                <h2>${title}</h2>
-                <p style="word-break: break-word; white-space: pre-wrap;">${msg}</p>
-                <button class="btn" onclick="Telegram.WebApp.close()" style="margin-top: 20px;">Закрыть</button>
-            `;
-        }
-    
-        try {
-            if (!tg) {
-                showError("Ошибка Telegram API", "Объект WebApp не найден. Убедитесь, что скрипт telegram-web-app.js загружен.");
-                return;
-            }
-    
-            tg.expand();
-    
-            // Получаем параметры из URL
-            const params = new URLSearchParams(window.location.search);
-            const buyAmount = params.get('buy');
-            const sellAmount = params.get('sell');
-            
-            // !!! --- ИСПОЛЬЗУЕМ ID ТОЛЬКО ИЗ ССЫЛКИ --- !!!
-            const effectiveUserId = params.get('id');
-    
-            // 1. Проверка наличия ID в ссылке
-            if (!effectiveUserId) {
-                showError("Ошибка ссылки", "В URL не найден параметр 'id'. Ваш бот должен добавлять ID пользователя в ссылку, например: ?id=12345.");
-                return;
-            }
-    
-            // 2. Проверка наличия суммы
-            if (!buyAmount && !sellAmount) {
-                 showError("Ошибка ссылки", "Не указана сумма для обмена (параметры buy или sell отсутствуют).");
-                 return;
-            }
-    
-            // Если все проверки пройдены, показываем интерфейс
+        } else {
             appDiv.style.display = 'flex';
-            initInterface(buyAmount, sellAmount, effectiveUserId);
-    
-    
-            function initInterface(buy, sell, userId) {
-                let actionType = '';
-                let amount = 0;
-                let cost = 0;
-                const RATE = 3; 
-    
-                // ... (Логика отображения остается без изменений) ...
-    
-                if (buy) {
-                    actionType = 'buy';
-                    amount = parseInt(buy);
-                    cost = amount * RATE;
-                    
-                    titleEl.textContent = "Покупка Флори";
-                    iconEl.textContent = "💠";
-                    amountEl.textContent = `+${amount} Флори`;
-                    descEl.innerHTML = `Вы отдадите <b>${cost} Рости</b>`;
-                    btnEl.textContent = `КУПИТЬ ЗА ${cost} РОСТИ`;
-                } else if (sell) {
-                    actionType = 'sell';
-                    amount = parseInt(sell);
-                    cost = amount * RATE;
-    
-                    titleEl.textContent = "Продажа Флори";
-                    iconEl.textContent = "▫️";
-                    amountEl.textContent = `+${cost} Рости`;
-                    descEl.innerHTML = `Вы отдадите <b>${amount} Флори</b>`;
-                    btnEl.textContent = `ПРОДАТЬ ЗА ${cost} РОСТИ`;
-                }
-    
-                // Обработка кнопки
-                btnEl.addEventListener('click', () => {
-                    const data = JSON.stringify({
-                        action: actionType,
-                        amount: amount,
-                        userId: userId 
-                    });
-                    // Отправляем данные, включая ID из URL
-                    tg.sendData(data);
+            initInterface();
+        }
+
+        function initInterface() {
+            let actionType = '';
+            let amount = 0;
+            let cost = 0;
+            const RATE = 3; // Курс 1 Флори = 3 Рости
+
+            if (buyAmount) {
+                actionType = 'buy';
+                amount = parseInt(buyAmount);
+                cost = amount * RATE;
+                
+                titleEl.textContent = "Покупка Флори";
+                iconEl.textContent = "💠";
+                amountEl.textContent = `+${amount} Флори`;
+                descEl.innerHTML = `Вы отдадите <b>${cost} Рости</b>`;
+                btnEl.textContent = `КУПИТЬ ЗА ${cost} РОСТИ`;
+            } else if (sellAmount) {
+                actionType = 'sell';
+                amount = parseInt(sellAmount);
+                cost = amount * RATE;
+
+                titleEl.textContent = "Продажа Флори";
+                iconEl.textContent = "▫️";
+                amountEl.textContent = `+${cost} Рости`;
+                descEl.innerHTML = `Вы отдадите <b>${amount} Флори</b>`;
+                btnEl.textContent = `ПРОДАТЬ ЗА ${cost} РОСТИ`;
+                // Меняем цвет для продажи на красноватый/оранжевый для различия, если нужно
+                // amountEl.style.color = '#ff9f0a';
+            } else {
+                titleEl.textContent = "Ошибка";
+                descEl.textContent = "Не указана сумма";
+                btnEl.style.display = 'none';
+                return;
+            }
+
+            // Обработка клика
+            btnEl.addEventListener('click', () => {
+                const data = JSON.stringify({
+                    action: actionType,
+                    amount: amount
                 });
-            }
-    
-        } catch (e) {
-            console.error(e);
-            // Если ошибка не была обработана выше
-            if (deniedDiv.style.display === 'none') {
-                showError("Сбой приложения", e.message);
-            }
+                tg.sendData(data);
+            });
         }
     </script>
 </body>

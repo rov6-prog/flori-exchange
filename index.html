@@ -138,7 +138,6 @@
     </div>
 
     <script>
-        // 1. Сразу получаем элементы, чтобы иметь возможность вывести ошибку
         const appDiv = document.getElementById('app');
         const deniedDiv = document.getElementById('denied');
         const titleEl = document.getElementById('action-title');
@@ -147,97 +146,103 @@
         const btnEl = document.getElementById('confirm-btn');
         const iconEl = document.getElementById('action-icon');
     
-        // Функция для отображения критической ошибки на экране (так как alert можно случайно закрыть)
-        function showCriticalError(msg) {
+        // Функция вывода диагностики
+        function showDebugInfo(errorMsg, debugData) {
             deniedDiv.style.display = 'flex';
+            deniedDiv.style.textAlign = 'left'; // Выравнивание влево для чтения логов
             deniedDiv.innerHTML = `
-                <div class="icon">⚠️</div>
-                <h2>Ошибка запуска</h2>
-                <p>${msg}</p>
+                <h2 style="color: #ff453a; text-align: center;">${errorMsg}</h2>
+                <p style="text-align: center; margin-bottom: 10px;">Сделайте скриншот этого экрана:</p>
+                <div style="background: #000; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 12px; overflow: auto; max-height: 400px; color: #0f0;">
+                    ${debugData}
+                </div>
+                <button class="btn" onclick="location.reload()" style="margin-top: 10px;">Обновить страницу</button>
             `;
         }
     
         try {
-            // Проверка: загрузился ли вообще объект Telegram
             if (!window.Telegram || !window.Telegram.WebApp) {
-                throw new Error("Telegram WebApp API не найден. Откройте эту страницу внутри Telegram.");
+                throw new Error("Telegram WebApp API not found");
             }
     
             const tg = window.Telegram.WebApp;
             tg.expand();
     
-            // Получаем параметры из URL
+            // --- СБОР ДАННЫХ ДЛЯ ОТЛАДКИ ---
+            // Мы собираем всё, что Telegram знает о среде запуска
+            const debugReport = {
+                platform: tg.platform,
+                version: tg.version,
+                // Пытаемся достать user из двух мест
+                user_unsafe: tg.initDataUnsafe ? tg.initDataUnsafe.user : 'undefined',
+                initData_raw: tg.initData, // Самая важная строка
+                theme: tg.themeParams,
+                url: window.location.href
+            };
+    
+            // --- ПОПЫТКА ИЗВЛЕЧЬ ID (Усиленная) ---
+            let currentUserId = null;
+    
+            // Способ 1: Прямой объект
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                currentUserId = String(tg.initDataUnsafe.user.id);
+            }
+            
+            // Способ 2: Парсинг строки initData (если объект пуст)
+            if (!currentUserId && tg.initData) {
+                const urlParams = new URLSearchParams(tg.initData);
+                const userJson = urlParams.get('user');
+                if (userJson) {
+                    try {
+                        const userObj = JSON.parse(userJson);
+                        currentUserId = String(userObj.id);
+                    } catch (e) {
+                        debugReport.parseError = e.message;
+                    }
+                }
+            }
+    
+            // --- ПРОВЕРКА ---
+            if (!currentUserId) {
+                // Если ID всё еще нет — показываем отчет
+                showDebugInfo(
+                    "ID пользователя не найден", 
+                    JSON.stringify(debugReport, null, 2)
+                );
+                throw new Error("User ID is null"); // Останавливаем выполнение
+            }
+    
+            // Получаем параметры из ссылки
             const params = new URLSearchParams(window.location.search);
             const buyAmount = params.get('buy');
             const sellAmount = params.get('sell');
             const targetId = params.get('id');
     
-            // --- Функция получения ID ---
-            function getCurrentUserId(tgInst) {
-                // Приоритет 1: user из initDataUnsafe
-                if (tgInst.initDataUnsafe && tgInst.initDataUnsafe.user) {
-                    return String(tgInst.initDataUnsafe.user.id);
-                }
-                // Приоритет 2: Парсинг сырой строки (на случай сбоев объекта)
-                if (tgInst.initData) {
-                    try {
-                        const urlParams = new URLSearchParams(tgInst.initData);
-                        const userDataString = urlParams.get('user');
-                        if (userDataString) {
-                            const user = JSON.parse(userDataString);
-                            return String(user.id);
-                        }
-                    } catch (e) {
-                        console.error("Error parsing initData:", e);
-                    }
-                }
-                return null; 
+            // Сверка ID
+            if (targetId && currentUserId !== targetId) {
+                showDebugInfo(
+                    "Чужой ID", 
+                    `Ваш ID: ${currentUserId}\nНужен ID: ${targetId}`
+                );
+            } else {
+                // УСПЕШНЫЙ ЗАПУСК
+                appDiv.style.display = 'flex';
+                
+                // Запускаем интерфейс
+                initInterface(buyAmount, sellAmount, currentUserId);
             }
     
-            const currentUserId = getCurrentUserId(tg);
-    
-            // --- ЛОГИКА ПРОВЕРКИ ---
-    
-            // 1. Если нет ID пользователя (например, открыто в браузере, а не в ТГ)
-            // Для тестов в браузере можно временно закомментировать проверку ниже
-            if (!currentUserId) {
-               // Если вы тестируете в браузере, currentUserId всегда будет null.
-               // Раскомментируйте следующую строку только для тестов на ПК без эмуляции:
-               // const currentUserId = "12345"; 
-               
-               if (!currentUserId) {
-                   showCriticalError("Не удалось определить ваш ID. Запустите через бота.");
-                   throw new Error("User ID not found"); // Прерываем выполнение
-               }
-            }
-    
-            // 2. Сверка ID
-            if (!targetId || currentUserId !== targetId) {
-                deniedDiv.querySelector('p').textContent = `Ваш ID: ${currentUserId || 'Не определен'} | Требуется: ${targetId || 'Нет в ссылке'}`;
-                deniedDiv.style.display = 'flex';
-            } 
-            // 3. Проверка параметров обмена
-            else {
-                if (!buyAmount && !sellAmount) {
-                    showCriticalError("В ссылке нет параметров buy или sell.");
-                } else {
-                    // Если всё ок — показываем интерфейс
-                    appDiv.style.display = 'flex';
-                    initInterface(buyAmount, sellAmount);
-                }
-            }
-    
-            function initInterface(buy, sell) {
+            function initInterface(buy, sell, userId) {
                 let actionType = '';
                 let amount = 0;
                 let cost = 0;
                 const RATE = 3; 
     
+                // Логика отображения (как и раньше)
                 if (buy) {
                     actionType = 'buy';
                     amount = parseInt(buy);
                     cost = amount * RATE;
-                    
                     titleEl.textContent = "Покупка Флори";
                     iconEl.textContent = "💠";
                     amountEl.textContent = `+${amount} Флори`;
@@ -247,26 +252,34 @@
                     actionType = 'sell';
                     amount = parseInt(sell);
                     cost = amount * RATE;
-    
                     titleEl.textContent = "Продажа Флори";
                     iconEl.textContent = "▫️";
                     amountEl.textContent = `+${cost} Рости`;
                     descEl.innerHTML = `Вы отдадите <b>${amount} Флори</b>`;
                     btnEl.textContent = `ПРОДАТЬ ЗА ${cost} РОСТИ`;
+                } else {
+                     titleEl.textContent = "Ошибка ссылки";
+                     descEl.textContent = "Нет суммы buy/sell";
+                     btnEl.style.display = 'none';
                 }
     
+                // Отправка данных
                 btnEl.addEventListener('click', () => {
                     const data = JSON.stringify({
                         action: actionType,
-                        amount: amount
+                        amount: amount,
+                        userId: userId // На всякий случай отправляем и ID
                     });
                     tg.sendData(data);
                 });
             }
     
         } catch (err) {
-            // Ловим любые ошибки JS и показываем их
-            showCriticalError(err.message);
+            console.error(err);
+            // Если ошибка не была обработана выше (например syntax error)
+            if (deniedDiv.style.display === 'none') {
+                 showDebugInfo("Критическая ошибка JS", err.message);
+            }
         }
     </script>
 </body>

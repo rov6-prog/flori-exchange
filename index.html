@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обмен Флори</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #1c1c1e);
+            --text-color: var(--tg-theme-text-color, #ffffff);
+            --hint-color: var(--tg-theme-hint-color, #9e9e9e);
+            --button-color: var(--tg-theme-button-color, #2ea6ff);
+            --button-text-color: var(--tg-theme-button-text-color, #ffffff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            --destructive-text: #ff453a;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 400px;
+            background-color: var(--secondary-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            display: none; /* Скрыто по умолчанию */
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .icon {
+            font-size: 64px;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .description {
+            color: var(--hint-color);
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .amount-display {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--button-color);
+            margin: 16px 0;
+        }
+
+        .error-message {
+            color: var(--destructive-text);
+            font-weight: bold;
+            display: none;
+        }
+
+        /* Кнопки как в ТГ */
+        .btn {
+            background-color: var(--button-color);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn:active {
+            opacity: 0.8;
+        }
+
+        /* Экран ошибки доступа */
+        .access-denied {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            height: 100%;
+            padding: 20px;
+        }
+
+        .access-denied h2 {
+            font-size: 22px;
+            margin-top: 10px;
+            color: var(--destructive-text);
+        }
+
+        .access-denied p {
+            color: var(--hint-color);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Интерфейс обмена -->
+    <div id="app" class="container">
+        <div id="action-icon" class="icon">💠</div>
+        <h1 id="action-title">Обмен</h1>
+        <div class="description" id="action-desc">Подтвердите операцию</div>
+        
+        <div class="amount-display" id="amount-text">0</div>
+
+        <button class="btn" id="confirm-btn">ПОДТВЕРДИТЬ</button>
+    </div>
+
+    <!-- Экран "Не для тебя" -->
+    <div id="denied" class="access-denied">
+        <div class="icon">🚫</div>
+        <h2>Доступ запрещен</h2>
+        <p>Эта операция предназначена для другого пользователя.</p>
+        <p>Иди своей дорогой, сталкер.</p>
+        <button class="btn" onclick="Telegram.WebApp.close()" style="margin-top: 20px; background-color: var(--secondary-bg); color: var(--text-color);">Закрыть</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // На весь экран
+
+        // Получаем параметры из URL
+        const params = new URLSearchParams(window.location.search);
+        
+        // ?buy=100 или ?sell=100
+        const buyAmount = params.get('buy');
+        const sellAmount = params.get('sell');
+        const targetId = params.get('id'); // ID для сверки
+
+        // Логика проверки пользователя
+        const currentUser = tg.initDataUnsafe?.user;
+        const currentUserId = currentUser ? String(currentUser.id) : null;
+
+        // Элементы
+        const appDiv = document.getElementById('app');
+        const deniedDiv = document.getElementById('denied');
+        const titleEl = document.getElementById('action-title');
+        const descEl = document.getElementById('action-desc');
+        const amountEl = document.getElementById('amount-text');
+        const btnEl = document.getElementById('confirm-btn');
+        const iconEl = document.getElementById('action-icon');
+
+        // Проверка ID
+        if (!currentUserId || !targetId || currentUserId !== targetId) {
+            deniedDiv.style.display = 'flex';
+        } else {
+            appDiv.style.display = 'flex';
+            initInterface();
+        }
+
+        function initInterface() {
+            let actionType = '';
+            let amount = 0;
+            let cost = 0;
+            const RATE = 3; // Курс 1 Флори = 3 Рости
+
+            if (buyAmount) {
+                actionType = 'buy';
+                amount = parseInt(buyAmount);
+                cost = amount * RATE;
+                
+                titleEl.textContent = "Покупка Флори";
+                iconEl.textContent = "💠";
+                amountEl.textContent = `+${amount} Флори`;
+                descEl.innerHTML = `Вы отдадите <b>${cost} Рости</b>`;
+                btnEl.textContent = `КУПИТЬ ЗА ${cost} РОСТИ`;
+            } else if (sellAmount) {
+                actionType = 'sell';
+                amount = parseInt(sellAmount);
+                cost = amount * RATE;
+
+                titleEl.textContent = "Продажа Флори";
+                iconEl.textContent = "▫️";
+                amountEl.textContent = `+${cost} Рости`;
+                descEl.innerHTML = `Вы отдадите <b>${amount} Флори</b>`;
+                btnEl.textContent = `ПРОДАТЬ ЗА ${cost} РОСТИ`;
+                // Меняем цвет для продажи на красноватый/оранжевый для различия, если нужно
+                // amountEl.style.color = '#ff9f0a';
+            } else {
+                titleEl.textContent = "Ошибка";
+                descEl.textContent = "Не указана сумма";
+                btnEl.style.display = 'none';
+                return;
+            }
+
+            // Обработка клика
+            btnEl.addEventListener('click', () => {
+                const data = JSON.stringify({
+                    action: actionType,
+                    amount: amount
+                });
+                tg.sendData(data);
+            });
+        }
+    </script>
+</body>
+</html>

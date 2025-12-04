@@ -199,7 +199,12 @@
             
             deniedDiv.style.display = 'flex';
         } else {
-            // Если ID совпали, открываем приложение
+            // --- НОВАЯ ДИАГНОСТИКА ---
+            if (!buyAmount && !sellAmount) {
+                 alert(`ОШИБКА URL. Нет параметров обмена.\nURL: ${window.location.search}\n\nПопробуйте повторить команду /обмен в боте.`);
+            }
+            // --- КОНЕЦ ДИАГНОСТИКИ ---
+            
             appDiv.style.display = 'flex';
             initInterface();
         }

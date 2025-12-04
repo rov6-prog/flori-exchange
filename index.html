@@ -138,75 +138,68 @@
     </div>
 
     <script>
+        const tg = window.Telegram.WebApp;
+        // Элементы
         const appDiv = document.getElementById('app');
         const deniedDiv = document.getElementById('denied');
-        
-        // Элементы интерфейса
         const titleEl = document.getElementById('action-title');
         const descEl = document.getElementById('action-desc');
         const amountEl = document.getElementById('amount-text');
         const btnEl = document.getElementById('confirm-btn');
         const iconEl = document.getElementById('action-icon');
     
-        // Функция для показа ошибок (с исправленным переносом строк)
+        // Функция для показа критических ошибок
         function showError(title, msg) {
             deniedDiv.style.display = 'flex';
+            deniedDiv.style.textAlign = 'center';
             deniedDiv.innerHTML = `
                 <div class="icon">⚠️</div>
                 <h2>${title}</h2>
                 <p style="word-break: break-word; white-space: pre-wrap;">${msg}</p>
-                <button class="btn" onclick="location.reload()" style="margin-top: 20px;">Попробовать снова</button>
+                <button class="btn" onclick="Telegram.WebApp.close()" style="margin-top: 20px;">Закрыть</button>
             `;
         }
     
         try {
-            const tg = window.Telegram.WebApp;
-            tg.expand(); // Раскрываем на весь экран
-    
-            // 1. Пытаемся получить ID из Telegram (initData)
-            let telegramUserId = null;
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                telegramUserId = String(tg.initDataUnsafe.user.id);
+            if (!tg) {
+                showError("Ошибка Telegram API", "Объект WebApp не найден. Убедитесь, что скрипт telegram-web-app.js загружен.");
+                return;
             }
     
-            // 2. Получаем данные из ссылки (URL)
+            tg.expand();
+    
+            // Получаем параметры из URL
             const params = new URLSearchParams(window.location.search);
             const buyAmount = params.get('buy');
             const sellAmount = params.get('sell');
-            const urlId = params.get('id'); // ID, который вписал бот в ссылку
+            
+            // !!! --- ИСПОЛЬЗУЕМ ID ТОЛЬКО ИЗ ССЫЛКИ --- !!!
+            const effectiveUserId = params.get('id');
     
-            // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ---
-            // Если Telegram не отдал ID, берем его из ссылки.
-            // Это позволяет интерфейсу открыться.
-            const effectiveUserId = telegramUserId || urlId;
-    
-            // Если ID нет нигде (ни в ТГ, ни в ссылке) — тогда ошибка
+            // 1. Проверка наличия ID в ссылке
             if (!effectiveUserId) {
-                showError("Ошибка доступа", "Не удалось определить ваш ID ни через Telegram, ни через ссылку. Проверьте, что бот добавляет ?id=... в URL.");
-                throw new Error("No ID found");
+                showError("Ошибка ссылки", "В URL не найден параметр 'id'. Ваш бот должен добавлять ID пользователя в ссылку, например: ?id=12345.");
+                return;
             }
     
-            // Если есть оба ID, но они не совпадают (защита от пересылки ссылки другу)
-            if (telegramUserId && urlId && telegramUserId !== urlId) {
-                showError("Чужой профиль", `Эта ссылка для пользователя ${urlId}, а вы — ${telegramUserId}.`);
-                throw new Error("ID mismatch");
-            }
-    
-            // Проверка сумм
+            // 2. Проверка наличия суммы
             if (!buyAmount && !sellAmount) {
-                 showError("Ошибка ссылки", "Не указана сумма (параметры buy или sell отсутствуют).");
-                 throw new Error("No amount params");
+                 showError("Ошибка ссылки", "Не указана сумма для обмена (параметры buy или sell отсутствуют).");
+                 return;
             }
     
-            // Если мы здесь — всё хорошо, запускаем интерфейс
+            // Если все проверки пройдены, показываем интерфейс
             appDiv.style.display = 'flex';
             initInterface(buyAmount, sellAmount, effectiveUserId);
+    
     
             function initInterface(buy, sell, userId) {
                 let actionType = '';
                 let amount = 0;
                 let cost = 0;
                 const RATE = 3; 
+    
+                // ... (Логика отображения остается без изменений) ...
     
                 if (buy) {
                     actionType = 'buy';
@@ -237,15 +230,14 @@
                         amount: amount,
                         userId: userId 
                     });
+                    // Отправляем данные, включая ID из URL
                     tg.sendData(data);
-                    // Можно закрыть окно после отправки, но обычно это делает сам ТГ
-                    // tg.close(); 
                 });
             }
     
         } catch (e) {
-            // Если упало что-то совсем неожиданное
             console.error(e);
+            // Если ошибка не была обработана выше
             if (deniedDiv.style.display === 'none') {
                 showError("Сбой приложения", e.message);
             }

@@ -140,97 +140,67 @@
     <script>
         const appDiv = document.getElementById('app');
         const deniedDiv = document.getElementById('denied');
+        
+        // Элементы интерфейса
         const titleEl = document.getElementById('action-title');
         const descEl = document.getElementById('action-desc');
         const amountEl = document.getElementById('amount-text');
         const btnEl = document.getElementById('confirm-btn');
         const iconEl = document.getElementById('action-icon');
     
-        // Функция вывода диагностики
-        function showDebugInfo(errorMsg, debugData) {
+        // Функция для показа ошибок (с исправленным переносом строк)
+        function showError(title, msg) {
             deniedDiv.style.display = 'flex';
-            deniedDiv.style.textAlign = 'left'; // Выравнивание влево для чтения логов
             deniedDiv.innerHTML = `
-                <h2 style="color: #ff453a; text-align: center;">${errorMsg}</h2>
-                <p style="text-align: center; margin-bottom: 10px;">Сделайте скриншот этого экрана:</p>
-                <div style="background: #000; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 12px; overflow: auto; max-height: 400px; color: #0f0;">
-                    ${debugData}
-                </div>
-                <button class="btn" onclick="location.reload()" style="margin-top: 10px;">Обновить страницу</button>
+                <div class="icon">⚠️</div>
+                <h2>${title}</h2>
+                <p style="word-break: break-word; white-space: pre-wrap;">${msg}</p>
+                <button class="btn" onclick="location.reload()" style="margin-top: 20px;">Попробовать снова</button>
             `;
         }
     
         try {
-            if (!window.Telegram || !window.Telegram.WebApp) {
-                throw new Error("Telegram WebApp API not found");
-            }
-    
             const tg = window.Telegram.WebApp;
-            tg.expand();
+            tg.expand(); // Раскрываем на весь экран
     
-            // --- СБОР ДАННЫХ ДЛЯ ОТЛАДКИ ---
-            // Мы собираем всё, что Telegram знает о среде запуска
-            const debugReport = {
-                platform: tg.platform,
-                version: tg.version,
-                // Пытаемся достать user из двух мест
-                user_unsafe: tg.initDataUnsafe ? tg.initDataUnsafe.user : 'undefined',
-                initData_raw: tg.initData, // Самая важная строка
-                theme: tg.themeParams,
-                url: window.location.href
-            };
-    
-            // --- ПОПЫТКА ИЗВЛЕЧЬ ID (Усиленная) ---
-            let currentUserId = null;
-    
-            // Способ 1: Прямой объект
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-                currentUserId = String(tg.initDataUnsafe.user.id);
-            }
-            
-            // Способ 2: Парсинг строки initData (если объект пуст)
-            if (!currentUserId && tg.initData) {
-                const urlParams = new URLSearchParams(tg.initData);
-                const userJson = urlParams.get('user');
-                if (userJson) {
-                    try {
-                        const userObj = JSON.parse(userJson);
-                        currentUserId = String(userObj.id);
-                    } catch (e) {
-                        debugReport.parseError = e.message;
-                    }
-                }
+            // 1. Пытаемся получить ID из Telegram (initData)
+            let telegramUserId = null;
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                telegramUserId = String(tg.initDataUnsafe.user.id);
             }
     
-            // --- ПРОВЕРКА ---
-            if (!currentUserId) {
-                // Если ID всё еще нет — показываем отчет
-                showDebugInfo(
-                    "ID пользователя не найден", 
-                    JSON.stringify(debugReport, null, 2)
-                );
-                throw new Error("User ID is null"); // Останавливаем выполнение
-            }
-    
-            // Получаем параметры из ссылки
+            // 2. Получаем данные из ссылки (URL)
             const params = new URLSearchParams(window.location.search);
             const buyAmount = params.get('buy');
             const sellAmount = params.get('sell');
-            const targetId = params.get('id');
+            const urlId = params.get('id'); // ID, который вписал бот в ссылку
     
-            // Сверка ID
-            if (targetId && currentUserId !== targetId) {
-                showDebugInfo(
-                    "Чужой ID", 
-                    `Ваш ID: ${currentUserId}\nНужен ID: ${targetId}`
-                );
-            } else {
-                // УСПЕШНЫЙ ЗАПУСК
-                appDiv.style.display = 'flex';
-                
-                // Запускаем интерфейс
-                initInterface(buyAmount, sellAmount, currentUserId);
+            // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ---
+            // Если Telegram не отдал ID, берем его из ссылки.
+            // Это позволяет интерфейсу открыться.
+            const effectiveUserId = telegramUserId || urlId;
+    
+            // Если ID нет нигде (ни в ТГ, ни в ссылке) — тогда ошибка
+            if (!effectiveUserId) {
+                showError("Ошибка доступа", "Не удалось определить ваш ID ни через Telegram, ни через ссылку. Проверьте, что бот добавляет ?id=... в URL.");
+                throw new Error("No ID found");
             }
+    
+            // Если есть оба ID, но они не совпадают (защита от пересылки ссылки другу)
+            if (telegramUserId && urlId && telegramUserId !== urlId) {
+                showError("Чужой профиль", `Эта ссылка для пользователя ${urlId}, а вы — ${telegramUserId}.`);
+                throw new Error("ID mismatch");
+            }
+    
+            // Проверка сумм
+            if (!buyAmount && !sellAmount) {
+                 showError("Ошибка ссылки", "Не указана сумма (параметры buy или sell отсутствуют).");
+                 throw new Error("No amount params");
+            }
+    
+            // Если мы здесь — всё хорошо, запускаем интерфейс
+            appDiv.style.display = 'flex';
+            initInterface(buyAmount, sellAmount, effectiveUserId);
     
             function initInterface(buy, sell, userId) {
                 let actionType = '';
@@ -238,11 +208,11 @@
                 let cost = 0;
                 const RATE = 3; 
     
-                // Логика отображения (как и раньше)
                 if (buy) {
                     actionType = 'buy';
                     amount = parseInt(buy);
                     cost = amount * RATE;
+                    
                     titleEl.textContent = "Покупка Флори";
                     iconEl.textContent = "💠";
                     amountEl.textContent = `+${amount} Флори`;
@@ -252,33 +222,32 @@
                     actionType = 'sell';
                     amount = parseInt(sell);
                     cost = amount * RATE;
+    
                     titleEl.textContent = "Продажа Флори";
                     iconEl.textContent = "▫️";
                     amountEl.textContent = `+${cost} Рости`;
                     descEl.innerHTML = `Вы отдадите <b>${amount} Флори</b>`;
                     btnEl.textContent = `ПРОДАТЬ ЗА ${cost} РОСТИ`;
-                } else {
-                     titleEl.textContent = "Ошибка ссылки";
-                     descEl.textContent = "Нет суммы buy/sell";
-                     btnEl.style.display = 'none';
                 }
     
-                // Отправка данных
+                // Обработка кнопки
                 btnEl.addEventListener('click', () => {
                     const data = JSON.stringify({
                         action: actionType,
                         amount: amount,
-                        userId: userId // На всякий случай отправляем и ID
+                        userId: userId 
                     });
                     tg.sendData(data);
+                    // Можно закрыть окно после отправки, но обычно это делает сам ТГ
+                    // tg.close(); 
                 });
             }
     
-        } catch (err) {
-            console.error(err);
-            // Если ошибка не была обработана выше (например syntax error)
+        } catch (e) {
+            // Если упало что-то совсем неожиданное
+            console.error(e);
             if (deniedDiv.style.display === 'none') {
-                 showDebugInfo("Критическая ошибка JS", err.message);
+                showError("Сбой приложения", e.message);
             }
         }
     </script>

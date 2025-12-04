@@ -164,12 +164,12 @@
 
         // Проверка ID
         if (!currentUserId || !targetId || currentUserId !== targetId) {
+            alert(`ОШИБКА ДОСТУПА:\n\nМой ID (из ТГ): ${currentUserId}\nID в ссылке: ${targetId}\nСсылка: ${window.location.search}`);
             deniedDiv.style.display = 'flex';
         } else {
             appDiv.style.display = 'flex';
             initInterface();
         }
-
         function initInterface() {
             let actionType = '';
             let amount = 0;

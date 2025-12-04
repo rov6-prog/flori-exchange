@@ -139,7 +139,12 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // На весь экран
+        tg.expand();
+        if (!tg) {
+            console.error("Telegram WebApp API is not available.");
+            // Можно показать ошибку пользователю, если нужно
+            return; 
+        }
 
         // Получаем параметры из URL
         const params = new URLSearchParams(window.location.search);

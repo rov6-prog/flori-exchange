@@ -155,8 +155,33 @@
         const targetId = params.get('id'); // ID для сверки
 
         // Логика проверки пользователя
-        const currentUser = tg.initDataUnsafe?.user;
-        const currentUserId = currentUser ? String(currentUser.id) : null;
+        // --- Функция для безопасного извлечения ID пользователя (СТРАХОВКА) ---
+        function getCurrentUserId(tg) {
+            // Приоритет 1: Инициализированный объект (стандартный, но нестабильный метод)
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                return String(tg.initDataUnsafe.user.id);
+            }
+
+            // Приоритет 2: Парсинг raw initData (надежный обход, когда user пуст)
+            if (tg.initData) {
+                try {
+                    const params = new URLSearchParams(tg.initData);
+                    const userDataString = params.get('user');
+                    if (userDataString) {
+                        const user = JSON.parse(userDataString);
+                        if (user && user.id) {
+                            return String(user.id);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to parse user data from tg.initData:", e);
+                }
+            }
+            
+            return null;
+        }
+
+        const currentUserId = getCurrentUserId(tg);
 
         // Элементы
         const appDiv = document.getElementById('app');
@@ -169,12 +194,16 @@
 
         // Проверка ID
         if (!currentUserId || !targetId || currentUserId !== targetId) {
-            alert(`ОШИБКА ДОСТУПА:\n\nМой ID (из ТГ): ${currentUserId}\nID в ссылке: ${targetId}\nСсылка: ${window.location.search}`);
+            // Оставляем alert для отладки, чтобы вы убедились в результате
+            alert(`⛔️ ОТКАЗАНО В ДОСТУПЕ. Проверьте ID.\n\nМой ID (из ТГ): ${currentUserId}\nID в ссылке: ${targetId}\nСсылка: ${window.location.search}`);
+            
             deniedDiv.style.display = 'flex';
         } else {
+            // Если ID совпали, открываем приложение
             appDiv.style.display = 'flex';
             initInterface();
         }
+        
         function initInterface() {
             let actionType = '';
             let amount = 0;

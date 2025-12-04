@@ -150,9 +150,9 @@
         const targetId = params.get('id'); // ID для сверки
 
         // Логика проверки пользователя
-        const currentUser = tg.initDataUnsafe?.user;
-        const currentUserId = currentUser ? String(currentUser.id) : null;
-
+        // const currentUser = tg.initDataUnsafe?.user;
+        //const currentUserId = currentUser ? String(currentUser.id) : null;
+        // если вернёшь то раскоментируй хз
         // Элементы
         const appDiv = document.getElementById('app');
         const deniedDiv = document.getElementById('denied');
@@ -163,12 +163,13 @@
         const iconEl = document.getElementById('action-icon');
 
         // Проверка ID
-        if (!currentUserId || !targetId || currentUserId !== targetId) {
-            deniedDiv.style.display = 'flex';
-        } else {
-            appDiv.style.display = 'flex';
-            initInterface();
-        }
+        //if (!currentUserId || !targetId || currentUserId !== targetId) {
+        //    deniedDiv.style.display = 'flex';
+        // } else {
+        appDiv.style.display = 'flex';
+        initInterface();
+        //}
+        // и это тоже
 
         function initInterface() {
             let actionType = '';

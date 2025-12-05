@@ -286,23 +286,18 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand(); 
-        
-        // Включаем подтверждение закрытия, чтобы случайно не свайпнуть
         tg.enableClosingConfirmation();
-
+    
+        const API_URL = 'https://kalel-rookier-reverentially.ngrok-free.dev/api/exchange/validate'; // ЗАМЕНИТЕ на ваш домен
+    
         const params = new URLSearchParams(window.location.search);
         const buyAmount = params.get('buy');
         const sellAmount = params.get('sell');
         const targetId = params.get('id'); 
-
-        // Логика User ID (оставил закомментированной как в оригинале)
-        // const currentUser = tg.initDataUnsafe?.user;
-        // const currentUserId = currentUser ? String(currentUser.id) : null;
-
+    
         const appDiv = document.getElementById('app');
         const deniedDiv = document.getElementById('denied');
         
-        // Элементы UI
         const titleEl = document.getElementById('action-title');
         const iconEl = document.getElementById('action-icon');
         const btnEl = document.getElementById('confirm-btn');
@@ -313,59 +308,59 @@
         const payCurrencyEl = document.getElementById('pay-currency');
         const receiveAmountEl = document.getElementById('receive-amount');
         const receiveCurrencyEl = document.getElementById('receive-currency');
-
-        // Проверка ID (если нужно раскомментировать)
-        // if (currentUserId && targetId && currentUserId !== targetId) {
-        //    deniedDiv.style.display = 'flex';
-        //    tg.HapticFeedback.notificationOccurred('error');
-        // } else {
+    
+        // Проверка авторизации
+        const currentUser = tg.initDataUnsafe?.user;
+        const currentUserId = currentUser ? String(currentUser.id) : null;
+    
+        if (currentUserId && targetId && currentUserId !== targetId) {
+            deniedDiv.style.display = 'flex';
+            tg.HapticFeedback.notificationOccurred('error');
+        } else {
             appDiv.style.display = 'flex';
             initInterface();
-        // }
-
+        }
+    
         function initInterface() {
             let actionType = '';
             let amountIn = 0;
             let amountOut = 0;
             const RATE = 3; 
-
+    
             if (buyAmount) {
-                // ПОКУПКА ФЛОРИ
                 actionType = 'buy';
-                appDiv.classList.add('mode-buy'); // Включаем синюю тему
+                appDiv.classList.add('mode-buy');
                 
-                amountOut = parseInt(buyAmount); // Получаем Флори
-                amountIn = amountOut * RATE;     // Платим Рости
-
+                amountOut = parseInt(buyAmount);
+                amountIn = amountOut * RATE;
+    
                 titleEl.textContent = "Покупка Флори";
-                iconEl.textContent = "💠";
+                iconEl.textContent = "💎";
                 
-                // Настраиваем визуализацию
                 payAmountEl.textContent = amountIn;
-                payCurrencyEl.textContent = "РОСТИ 🍪";
+                payCurrencyEl.textContent = "РОСТИ 🪙";
                 
                 receiveAmountEl.textContent = amountOut;
-                receiveCurrencyEl.textContent = "ФЛОРИ 💠";
-
+                receiveCurrencyEl.textContent = "ФЛОРИ 💎";
+    
                 btnText.textContent = `КУПИТЬ ЗА ${amountIn} РОСТИ`;
-
+    
             } else if (sellAmount) {
-                // ПРОДАЖА ФЛОРИ
                 actionType = 'sell';
-                appDiv.classList.add('mode-sell'); // Включаем оранжевую тему
+                appDiv.classList.add('mode-sell');
                 
-                amountIn = parseInt(sellAmount); // Платим Флори
-                amountOut = amountIn * RATE;     // Получаем Рости
-
+                amountIn = parseInt(sellAmount);
+                amountOut = amountIn * RATE;
+    
                 titleEl.textContent = "Продажа Флори";
-                iconEl.textContent = "⚖️"; // Иконка весов или другая
+                iconEl.textContent = "⚖️";
                 
                 payAmountEl.textContent = amountIn;
-                payCurrencyEl.textContent = "ФЛОРИ 💠";
+                payCurrencyEl.textContent = "ФЛОРИ 💎";
                 
                 receiveAmountEl.textContent = amountOut;
-                receiveCurrencyEl.textContent = "РОСТИ 🍪";
-
+                receiveCurrencyEl.textContent = "РОСТИ 🪙";
+    
                 btnText.textContent = `ПРОДАТЬ ЗА ${amountOut} РОСТИ`;
                 
             } else {
@@ -373,25 +368,60 @@
                 btnEl.style.display = 'none';
                 return;
             }
-
-            // Обработка клика
-            btnEl.addEventListener('click', () => {
-                // Тактильная отдача при нажатии
+    
+            btnEl.addEventListener('click', async () => {
                 tg.HapticFeedback.impactOccurred('heavy');
-
-                // Анимация загрузки на кнопке
+    
                 btnText.style.display = 'none';
                 btnLoader.style.display = 'block';
-                btnEl.style.pointerEvents = 'none'; // Блокируем повторный клик
-
-                // Небольшая задержка для плавности UX (опционально)
-                setTimeout(() => {
-                    const data = JSON.stringify({
-                        action: actionType,
-                        amount: actionType === 'buy' ? amountOut : amountIn
+                btnEl.style.pointerEvents = 'none';
+    
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            initData: tg.initData,
+                            action: actionType,
+                            amount: actionType === 'buy' ? amountOut : amountIn
+                        })
                     });
-                    tg.sendData(data);
-                }, 400);
+    
+                    const result = await response.json();
+    
+                    if (response.ok && result.success) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                        
+                        // Показываем успех и закрываем через 1 секунду
+                        btnText.textContent = '✅ УСПЕШНО';
+                        btnText.style.display = 'block';
+                        btnLoader.style.display = 'none';
+                        
+                        setTimeout(() => {
+                            tg.close();
+                        }, 1000);
+                    } else {
+                        throw new Error(result.error || result.detail || 'Ошибка обмена');
+                    }
+    
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    tg.HapticFeedback.notificationOccurred('error');
+                    
+                    btnText.textContent = '❌ ' + (error.message || 'ОШИБКА');
+                    btnText.style.display = 'block';
+                    btnLoader.style.display = 'none';
+                    btnEl.style.pointerEvents = 'auto';
+                    
+                    // Возвращаем текст кнопки через 2 секунды
+                    setTimeout(() => {
+                        btnText.textContent = actionType === 'buy' 
+                            ? `КУПИТЬ ЗА ${amountIn} РОСТИ`
+                            : `ПРОДАТЬ ЗА ${amountOut} РОСТИ`;
+                    }, 2000);
+                }
             });
         }
     </script>

@@ -2,9 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Обмен Флори</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: var(--tg-theme-bg-color, #1c1c1e);
@@ -13,86 +14,192 @@
             --button-color: var(--tg-theme-button-color, #2ea6ff);
             --button-text-color: var(--tg-theme-button-text-color, #ffffff);
             --secondary-bg: var(--tg-theme-secondary-bg-color, #2c2c2e);
-            --destructive-text: #ff453a;
+            
+            /* Кастомные цвета для типов операций */
+            --buy-gradient: linear-gradient(135deg, #2ea6ff 0%, #007aff 100%);
+            --sell-gradient: linear-gradient(135deg, #ff9f0a 0%, #ff3b30 100%);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --card-radius: 20px;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', -apple-system, sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            user-select: none;
+            min-height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        /* Фоновые декоративные пятна */
+        .glow-bg {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: var(--button-color);
+            filter: blur(120px);
+            opacity: 0.15;
+            z-index: -1;
+            border-radius: 50%;
+            top: -50px;
         }
 
         .container {
-            width: 90%;
-            max-width: 400px;
-            background-color: var(--secondary-bg);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            display: none; /* Скрыто по умолчанию */
+            width: 100%;
+            max-width: 380px;
+            display: none; /* Скрыто до инициализации */
             flex-direction: column;
-            gap: 16px;
+            gap: 20px;
+            animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        .icon {
-            font-size: 64px;
-            margin-bottom: 8px;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Карточка обмена */
+        .trade-card {
+            background-color: var(--secondary-bg);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header-icon {
+            font-size: 52px;
+            margin-bottom: 12px;
+            filter: drop-shadow(0 0 15px rgba(255,255,255,0.2));
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
         }
 
         h1 {
-            margin: 0;
-            font-size: 24px;
+            font-size: 22px;
+            font-weight: 800;
+            margin: 0 0 4px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--hint-color);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        /* Визуализация обмена (Отдаю -> Получаю) */
+        .exchange-visual {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        }
+
+        .exchange-row {
+            background: var(--bg-color);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .exchange-label {
+            font-size: 12px;
+            color: var(--hint-color);
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .currency-value {
+            font-size: 20px;
             font-weight: 700;
         }
 
-        .description {
+        .currency-name {
+            font-size: 14px;
+            opacity: 0.7;
+            font-weight: 500;
+        }
+
+        /* Стрелочка между блоками */
+        .swap-arrow {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--secondary-bg);
+            border: 4px solid var(--secondary-bg);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
             color: var(--hint-color);
-            font-size: 16px;
-            line-height: 1.5;
+            z-index: 2;
         }
 
-        .amount-display {
-            font-size: 32px;
-            font-weight: 800;
-            color: var(--button-color);
-            margin: 16px 0;
-        }
-
-        .error-message {
-            color: var(--destructive-text);
-            font-weight: bold;
-            display: none;
-        }
-
-        /* Кнопки как в ТГ */
-        .btn {
-            background-color: var(--button-color);
+        /* Главная кнопка */
+        .main-btn {
+            background: var(--button-color);
             color: var(--button-text-color);
             border: none;
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: 14px;
+            padding: 18px;
             font-size: 17px;
-            font-weight: 600;
-            cursor: pointer;
+            font-weight: 700;
             width: 100%;
-            transition: opacity 0.2s;
-            -webkit-tap-highlight-color: transparent;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 20px -6px var(--button-color);
         }
 
-        .btn:active {
-            opacity: 0.8;
+        .main-btn:active {
+            transform: scale(0.97);
+            opacity: 0.9;
         }
 
-        /* Экран ошибки доступа */
+        /* Стили для разных режимов */
+        .mode-buy .main-btn {
+            background: var(--buy-gradient);
+            box-shadow: 0 8px 20px -6px #2ea6ff;
+        }
+
+        .mode-sell .main-btn {
+            background: var(--sell-gradient);
+            box-shadow: 0 8px 20px -6px #ff9f0a;
+        }
+
+        .mode-sell .currency-value {
+            color: #ff9f0a; /* Акцент для продажи */
+        }
+        
+        .mode-buy .currency-value {
+            color: #2ea6ff; /* Акцент для покупки */
+        }
+
+        /* Экран ошибки */
         .access-denied {
             display: none;
             flex-direction: column;
@@ -100,119 +207,191 @@
             justify-content: center;
             text-align: center;
             height: 100%;
-            padding: 20px;
+            opacity: 0;
+            animation: fadeIn 0.5s forwards;
         }
 
-        .access-denied h2 {
-            font-size: 22px;
-            margin-top: 10px;
-            color: var(--destructive-text);
+        .access-denied .emoji {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+        
+        /* Loader на кнопке */
+        .loader {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto;
         }
 
-        .access-denied p {
-            color: var(--hint-color);
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
     </style>
 </head>
 <body>
 
-    <!-- Интерфейс обмена -->
-    <div id="app" class="container">
-        <div id="action-icon" class="icon">💠</div>
-        <h1 id="action-title">Обмен</h1>
-        <div class="description" id="action-desc">Подтвердите операцию</div>
-        
-        <div class="amount-display" id="amount-text">0</div>
+    <div class="glow-bg"></div>
 
-        <button class="btn" id="confirm-btn">ПОДТВЕРДИТЬ</button>
+    <div id="app" class="container">
+        <div class="trade-card">
+            <div id="action-icon" class="header-icon">💠</div>
+            <h1 id="action-title">Обмен</h1>
+            <div class="subtitle">Подтвердите детали сделки</div>
+
+            <div class="exchange-visual">
+                <div class="exchange-row">
+                    <div>
+                        <div class="exchange-label">Вы отдаете</div>
+                        <div class="currency-value" id="pay-amount">0</div>
+                    </div>
+                    <div class="currency-name" id="pay-currency">CUR</div>
+                </div>
+
+                <div class="swap-arrow">↓</div>
+
+                <div class="exchange-row">
+                    <div>
+                        <div class="exchange-label">Вы получаете</div>
+                        <div class="currency-value" id="receive-amount">0</div>
+                    </div>
+                    <div class="currency-name" id="receive-currency">CUR</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="main-btn" id="confirm-btn">
+            <span id="btn-text">ПОДТВЕРДИТЬ</span>
+            <div class="loader" id="btn-loader"></div>
+        </button>
+        
+        <div style="text-align: center; color: var(--hint-color); font-size: 12px; margin-top: -10px;">
+            Курс обмена: 1 Флори = 3 Рости
+        </div>
     </div>
 
-    <!-- Экран "Не для тебя" -->
     <div id="denied" class="access-denied">
-        <div class="icon">🚫</div>
+        <div class="emoji">🚫</div>
         <h2>Доступ запрещен</h2>
-        <p>Эта операция предназначена для другого пользователя.</p>
-        <p>Иди своей дорогой, сталкер.</p>
-        <button class="btn" onclick="Telegram.WebApp.close()" style="margin-top: 20px; background-color: var(--secondary-bg); color: var(--text-color);">Закрыть</button>
+        <p style="color: var(--hint-color); margin: 10px 0 30px;">Эта операция предназначена<br>для другого пользователя.</p>
+        <button class="main-btn" onclick="Telegram.WebApp.close()" style="background: var(--secondary-bg); color: var(--text-color); box-shadow: none;">Закрыть</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // На весь экран
-
-        // Получаем параметры из URL
-        const params = new URLSearchParams(window.location.search);
+        tg.expand(); 
         
-        // ?buy=100 или ?sell=100
+        // Включаем подтверждение закрытия, чтобы случайно не свайпнуть
+        tg.enableClosingConfirmation();
+
+        const params = new URLSearchParams(window.location.search);
         const buyAmount = params.get('buy');
         const sellAmount = params.get('sell');
-        const targetId = params.get('id'); // ID для сверки
+        const targetId = params.get('id'); 
 
-        // Логика проверки пользователя
+        // Логика User ID (оставил закомментированной как в оригинале)
         // const currentUser = tg.initDataUnsafe?.user;
-        //const currentUserId = currentUser ? String(currentUser.id) : null;
-        // если вернёшь то раскоментируй хз
-        // Элементы
+        // const currentUserId = currentUser ? String(currentUser.id) : null;
+
         const appDiv = document.getElementById('app');
         const deniedDiv = document.getElementById('denied');
+        
+        // Элементы UI
         const titleEl = document.getElementById('action-title');
-        const descEl = document.getElementById('action-desc');
-        const amountEl = document.getElementById('amount-text');
-        const btnEl = document.getElementById('confirm-btn');
         const iconEl = document.getElementById('action-icon');
+        const btnEl = document.getElementById('confirm-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnLoader = document.getElementById('btn-loader');
+        
+        const payAmountEl = document.getElementById('pay-amount');
+        const payCurrencyEl = document.getElementById('pay-currency');
+        const receiveAmountEl = document.getElementById('receive-amount');
+        const receiveCurrencyEl = document.getElementById('receive-currency');
 
-        // Проверка ID
-        //if (!currentUserId || !targetId || currentUserId !== targetId) {
+        // Проверка ID (если нужно раскомментировать)
+        // if (currentUserId && targetId && currentUserId !== targetId) {
         //    deniedDiv.style.display = 'flex';
+        //    tg.HapticFeedback.notificationOccurred('error');
         // } else {
-        appDiv.style.display = 'flex';
-        initInterface();
-        //}
-        // и это тоже
+            appDiv.style.display = 'flex';
+            initInterface();
+        // }
 
         function initInterface() {
             let actionType = '';
-            let amount = 0;
-            let cost = 0;
-            const RATE = 3; // Курс 1 Флори = 3 Рости
+            let amountIn = 0;
+            let amountOut = 0;
+            const RATE = 3; 
 
             if (buyAmount) {
+                // ПОКУПКА ФЛОРИ
                 actionType = 'buy';
-                amount = parseInt(buyAmount);
-                cost = amount * RATE;
+                appDiv.classList.add('mode-buy'); // Включаем синюю тему
                 
+                amountOut = parseInt(buyAmount); // Получаем Флори
+                amountIn = amountOut * RATE;     // Платим Рости
+
                 titleEl.textContent = "Покупка Флори";
                 iconEl.textContent = "💠";
-                amountEl.textContent = `+${amount} Флори`;
-                descEl.innerHTML = `Вы отдадите <b>${cost} Рости</b>`;
-                btnEl.textContent = `КУПИТЬ ЗА ${cost} РОСТИ`;
+                
+                // Настраиваем визуализацию
+                payAmountEl.textContent = amountIn;
+                payCurrencyEl.textContent = "РОСТИ 🍪";
+                
+                receiveAmountEl.textContent = amountOut;
+                receiveCurrencyEl.textContent = "ФЛОРИ 💠";
+
+                btnText.textContent = `КУПИТЬ ЗА ${amountIn} РОСТИ`;
+
             } else if (sellAmount) {
+                // ПРОДАЖА ФЛОРИ
                 actionType = 'sell';
-                amount = parseInt(sellAmount);
-                cost = amount * RATE;
+                appDiv.classList.add('mode-sell'); // Включаем оранжевую тему
+                
+                amountIn = parseInt(sellAmount); // Платим Флори
+                amountOut = amountIn * RATE;     // Получаем Рости
 
                 titleEl.textContent = "Продажа Флори";
-                iconEl.textContent = "▫️";
-                amountEl.textContent = `+${cost} Рости`;
-                descEl.innerHTML = `Вы отдадите <b>${amount} Флори</b>`;
-                btnEl.textContent = `ПРОДАТЬ ЗА ${cost} РОСТИ`;
-                // Меняем цвет для продажи на красноватый/оранжевый для различия, если нужно
-                // amountEl.style.color = '#ff9f0a';
+                iconEl.textContent = "⚖️"; // Иконка весов или другая
+                
+                payAmountEl.textContent = amountIn;
+                payCurrencyEl.textContent = "ФЛОРИ 💠";
+                
+                receiveAmountEl.textContent = amountOut;
+                receiveCurrencyEl.textContent = "РОСТИ 🍪";
+
+                btnText.textContent = `ПРОДАТЬ ЗА ${amountOut} РОСТИ`;
+                
             } else {
                 titleEl.textContent = "Ошибка";
-                descEl.textContent = "Не указана сумма";
                 btnEl.style.display = 'none';
                 return;
             }
 
             // Обработка клика
             btnEl.addEventListener('click', () => {
-                const data = JSON.stringify({
-                    action: actionType,
-                    amount: amount
-                });
-                tg.sendData(data);
+                // Тактильная отдача при нажатии
+                tg.HapticFeedback.impactOccurred('heavy');
+
+                // Анимация загрузки на кнопке
+                btnText.style.display = 'none';
+                btnLoader.style.display = 'block';
+                btnEl.style.pointerEvents = 'none'; // Блокируем повторный клик
+
+                // Небольшая задержка для плавности UX (опционально)
+                setTimeout(() => {
+                    const data = JSON.stringify({
+                        action: actionType,
+                        amount: actionType === 'buy' ? amountOut : amountIn
+                    });
+                    tg.sendData(data);
+                }, 400);
             });
         }
     </script>

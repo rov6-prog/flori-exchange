@@ -345,7 +345,13 @@
         const currentUserId = currentUser ? String(currentUser.id) : null;
         appDiv.style.display = 'flex';
         initInterface();
-    
+        // ОТЛАДКА - посмотрим что приходит
+        console.log('=== DEBUG INFO ===');
+        console.log('Full initDataUnsafe:', JSON.stringify(tg.initDataUnsafe, null, 2));
+        console.log('start_param:', tg.initDataUnsafe?.start_param);
+        console.log('window.location.search:', window.location.search);
+        console.log('window.location.href:', window.location.href);
+        
         function initInterface() {
             let actionType = '';
             let amountIn = 0 ;

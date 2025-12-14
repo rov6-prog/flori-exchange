@@ -346,18 +346,12 @@
         // Проверка авторизации
         const currentUser = tg.initDataUnsafe?.user;
         const currentUserId = currentUser ? String(currentUser.id) : null;
-    
-        if (currentUserId && targetId && currentUserId !== targetId) {
-            deniedDiv.style.display = 'flex';
-            tg.HapticFeedback.notificationOccurred('error');
-        } else {
-            appDiv.style.display = 'flex';
-            initInterface();
-        }
+        appDiv.style.display = 'flex';
+        initInterface();
     
         function initInterface() {
             let actionType = '';
-            let amountIn = 0;
+            let amountIn = 0 ;
             let amountOut = 0;
             const RATE = 3; 
     

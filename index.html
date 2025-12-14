@@ -296,7 +296,35 @@
     
         const API_URL = 'https://kalel-rookier-reverentially.ngrok-free.dev/api/exchange/validate'; // ЗАМЕНИТЕ на ваш домен
     
-        const params = new URLSearchParams(window.location.search);
+        let buyAmount = null;
+        let sellAmount = null;
+        let targetId = null;
+
+        // 1. Пытаемся получить данные из start_param (приходит от красивой ссылки)
+        // Формат строки: action_amount_uid (например: buy_100_12345678)
+        const startParam = tg.initDataUnsafe?.start_param;
+
+        if (startParam) {
+            const parts = startParam.split('_');
+            if (parts.length >= 3) {
+                const action = parts[0];
+                const amount = parts[1];
+                targetId = parts[2];
+
+                if (action === 'buy' || action === 'купить') {
+                    buyAmount = amount;
+                } else if (action === 'sell' || action === 'продать') {
+                    sellAmount = amount;
+                }
+            }
+        } 
+        // 2. Если start_param пустой, пробуем старый метод (через обычную ссылку)
+        else {
+            const params = new URLSearchParams(window.location.search);
+            buyAmount = params.get('buy');
+            sellAmount = params.get('sell');
+            targetId = params.get('id'); 
+        }
         const buyAmount = params.get('buy');
         const sellAmount = params.get('sell');
         const targetId = params.get('id'); 
